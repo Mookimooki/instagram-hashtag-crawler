@@ -17,7 +17,7 @@ def crawl(api, hashtag, config):
     #if visit_profile(api, hashtag, config):
     #    pass
 
-def upload_mongo(api, feed, config):
+def upload_mongo(api, feed, config, db):
     print("upload_mongo")
     processed_tagfeed = {
         'posts' : []
@@ -30,18 +30,13 @@ def upload_mongo(api, feed, config):
     else:
         processed_tagfeed['posts'] = posts[:config['max_collect_media']]
 
-    print("MongoDB init")
-    client = MongoClient('localhost', 27017)
-    db = client.test_database
-    collection = db.post
-
-    pp = pprint.PrettyPrinter(indent=2)
+        #pp = pprint.PrettyPrinter(indent=2)
     print ("Start upload")
     for post in processed_tagfeed['posts']:
         #if db.post.find_one({"user_id":5053046769,"date":datetime.datetime.fromtimestamp(1529214222).isoformat()})
         #pp.pprint(post)
         print(post['user_id'], post['date'])
-        print(db.post.find({"user_id": post['user_id'], "date": post['date']}).limit(1).count())
+        #print(db.post.find({"user_id": post['user_id'], "date": post['date']}).limit(1).count())
         
         if db.post.find({"user_id": post['user_id'], "date": post['date']}).limit(1).count() < 1:
             db.post.insert(post) 
@@ -111,6 +106,9 @@ def get_posts(api, hashtag, config):
         #feed.extend(results.get('items', []))
         feed_len += len(results.get('items', []))
         if config['min_timestamp'] is not None: return feed
+        print("MongoDB init")
+        client = MongoClient('localhost', 27017)
+        db = client.BigData
 
         next_max_id = results.get('next_max_id')
         while next_max_id and len(feed) < config['max_collect_media']:
@@ -127,7 +125,7 @@ def get_posts(api, hashtag, config):
             feed_len += len(results.get('items', []))
             #feed.extend(results.get('items', []))
             next_max_id = results.get('next_max_id')
-            upload_mongo(api, results.get('items', []), config)
+            upload_mongo(api, results.get('items', []), config, db)
 
     except Exception as e:
         print('exception while getting posts')
