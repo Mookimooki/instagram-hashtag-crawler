@@ -32,7 +32,6 @@ def sort_by_posts(dic, writer):
     posts = dic['posts']
     threshold = 60*60*24
     max_date = 0 #most recent
-    
     #don't save if no post
     if len(posts) == 0: return
 
@@ -62,7 +61,3 @@ def sort_by_posts(dic, writer):
         tags            = p['tags'] #11
         post = [pic_url, like_count, username, user_id, full_name, profile_pic_url, media_count, follower_count, comment_count, date, caption, tags]           
         writer.writerow(post)
-            
-
-        
-        
