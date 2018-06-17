@@ -6,6 +6,7 @@ from time import time, sleep
 from util import randselect, byteify, file_to_list
 import pprint # test log
 import datetime # to convet timestamp to ISODate
+import multiprocessing as mp #for multiprocessing
 from pymongo import MongoClient
 import csv
 
@@ -17,7 +18,7 @@ def crawl(api, hashtag, config):
     #if visit_profile(api, hashtag, config):
     #    pass
 
-def upload_mongo(api, feed, config, db):
+def upload_mongo(api, feed, config):
     print("upload_mongo")
     processed_tagfeed = {
         'posts' : []
@@ -29,6 +30,10 @@ def upload_mongo(api, feed, config, db):
         return False
     else:
         processed_tagfeed['posts'] = posts[:config['max_collect_media']]
+        
+        client = MongoClient('localhost', 27017)
+        db = client.BigData
+        
 
         #pp = pprint.PrettyPrinter(indent=2)
     print ("Start upload")
@@ -42,9 +47,10 @@ def upload_mongo(api, feed, config, db):
             db.post.insert(post) 
         else:
             pass
+    client.close()
 
 def beautify_post(api, post, profile_dic):
-    print("start beautify_post")
+    #print("start beautify_post")
     try:
         if post['media_type'] != 1: # If post is not a single image media
             return None
@@ -105,14 +111,17 @@ def get_posts(api, hashtag, config):
         feed_len = 0    #len(results.get('items', []))
         #feed.extend(results.get('items', []))
         feed_len += len(results.get('items', []))
-        if config['min_timestamp'] is not None: return feed
-        print("MongoDB init")
-        client = MongoClient('localhost', 27017)
+        if config['min_timestamp'] is not None :
+            upload_mongo(api, results.get('items', []), config)
+
+        client = MongoClient()
         db = client.BigData
 
+        jobs = []
         next_max_id = results.get('next_max_id')
+        db.config.update_one({},{'$set': {'max': next_max_id}}, upsert=False)
         while next_max_id and len(feed) < config['max_collect_media']:
-            print("next_max_id:", next_max_id)
+            #print("next_max_id:", next_max_id)
             print("len(feed):", feed_len, "< max:", config['max_collect_media'])
             try:
                 results = api.feed_tag(hashtag, rank_token=uuid, max_id=next_max_id)
@@ -125,9 +134,16 @@ def get_posts(api, hashtag, config):
             feed_len += len(results.get('items', []))
             #feed.extend(results.get('items', []))
             next_max_id = results.get('next_max_id')
-            upload_mongo(api, results.get('items', []), config, db)
+            db.config.update_one({},{'$set': {'max': next_max_id}}, upsert=False)
+            #upload_mongo(api, results.get('items', []), config, db)
+            p = mp.Process(target=upload_mongo, args=(api, results.get('items', []), config))
+            jobs.append(p)
+            p.start()
+        for p in jobs:
+            p.join()
 
     except Exception as e:
         print('exception while getting posts')
         raise e
+
 
