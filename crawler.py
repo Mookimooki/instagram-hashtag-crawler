@@ -110,7 +110,7 @@ def get_posts(api, hashtag, config):
             feed_len += len(results.get('items', []))
             #feed.extend(results.get('items', []))
             next_max_id = results.get('next_max_id')
-            print(next_max_id)
+            #print(next_max_id)
             #db.config.update_one({},{'$set': {'max': next_max_id}}, upsert=False)
             #upload_mongo(api, results.get('items', []), config, db)
             p = mp.Process(target=upload_mongo, args=(api, results.get('items', []), config))
