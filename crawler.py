@@ -5,7 +5,7 @@ from re import findall
 from time import time, sleep
 from util import randselect, byteify, file_to_list
 import pprint # test log
-import time 
+import datetime # to convet timestamp to ISODate
 from pymongo import MongoClient
 import csv
 
@@ -38,17 +38,18 @@ def visit_profile(api, hashtag, config):
                 raise e
 
             try:
+                print("store json")
                 with open(config['profile_path'] + os.sep + str(hashtag) + '.json', 'w') as outfile:
                     json.dump(processed_tagfeed, outfile, indent=2, ensure_ascii=False)
-                #pp = pprint.PrettyPrinter(indent=4)
-                #pp.pprint(processed_tagfeed['posts'][0])
-                #for post in feed:
-                #    print(type(post))
-                ##    time.sleep(5)
+                print("Init MongoDB")
+                client = MongoClient('localhost', 27017)
+                db = client.test_database
+                collection = db.post
 
-                #client = MongoClient('localhost', 27017)
-                #db = client.test_database
-                #collection = db.post
+                #pp = pprint.PrettyPrinter(indent=2)
+                for post in processed_tagfeed['posts']:
+                    collection.insert(post) 
+                    #pp.pprint(post)
 
             except Exception as e:
                 print('exception while dumping')
@@ -88,16 +89,16 @@ def beautify_post(api, post, profile_dic):
 		# print('Visiting:', profile['user']['username'])
 		processed_media = {
 			'user_id' : user_id,
-			'username' : profile['user']['username'],
-			'full_name' : profile['user']['full_name'],
-			'profile_pic_url' : profile['user']['profile_pic_url'],
-			'media_count' : profile['user']['media_count'],
-			'follower_count' : profile['user']['follower_count'],
-			'following_count' : profile['user']['following_count'],
-			'date' : post['taken_at'],
-			'pic_url' : post['image_versions2']['candidates'][0]['url'],
-			'like_count' : post['like_count'] if 'like_count' in keys else 0,
-			'comment_count' : post['comment_count'] if 'comment_count' in keys else 0,
+			#'username' : profile['user']['username'],
+			#'full_name' : profile['user']['full_name'],
+			#'profile_pic_url' : profile['user']['profile_pic_url'],
+			#'media_count' : profile['user']['media_count'],
+			#'follower_count' : profile['user']['follower_count'],
+			#'following_count' : profile['user']['following_count'],
+			'date' : datetime.datetime.fromtimestamp(post['taken_at']).isoformat(),
+			#'pic_url' : post['image_versions2']['candidates'][0]['url'],
+			#'like_count' : post['like_count'] if 'like_count' in keys else 0,
+			#'comment_count' : post['comment_count'] if 'comment_count' in keys else 0,
 			'caption' : post['caption']['text'] if 'caption' in keys and post['caption'] is not None else ''
 		}
 		processed_media['tags'] = findall(r'#[^#\s]*', processed_media['caption'])
