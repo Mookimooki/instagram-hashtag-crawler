@@ -34,6 +34,7 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--targetfile', dest='targetfile', type=str, required=False)
     parser.add_argument('-t', '--target', dest='target', type=str, required=False)
     parser.add_argument('-m', '--max', dest='max', type=int, required=True)
+    parser.add_argument('-r', '--resume', dest='resume', type=int, required=True)
     
     args = parser.parse_args()
     config = {
@@ -44,6 +45,7 @@ if __name__ == '__main__':
         # 'min_timestamp' : int(time() - 60*60*24*30*2)         # up to how recent you want the posts to be in seconds. If you do not want to use this, put None as value
         'max_id' : None,
         'min_timestamp' : None,
+        'resume': args.resume,
     }
     try:
         if args.target:

@@ -84,8 +84,10 @@ def get_posts(api, hashtag, config):
             config['max_id'] = db.config.find_one({"tag":hashtag})["max"]
         try:
             uuid = api.generate_uuid(return_hex=False, seed='0')
-            #results = api.feed_tag(hashtag, rank_token=uuid, min_timestamp=config['min_timestamp'])
-            results = api.feed_tag(hashtag, rank_token=uuid, max_id=config['max_id'])
+            if config['resume'] == 0:
+                results = api.feed_tag(hashtag, rank_token=uuid, min_timestamp=config['min_timestamp'])
+            else:
+                results = api.feed_tag(hashtag, rank_token=uuid, max_id=config['max_id'])
         except Exception as e:
             print('exception while getting feed1')
             raise e
@@ -96,8 +98,9 @@ def get_posts(api, hashtag, config):
 
         jobs = []
         next_max_id = results.get('next_max_id')
-        while next_max_id and len(feed) < config['max_collect_media']:
-            db.config.update_one({"tag":hashtag},{'$set': {'max': next_max_id}}, upsert=True)
+        while next_max_id and feed_len < config['max_collect_media']:
+            if config['resume'] == 1:
+                db.config.update_one({"tag":hashtag},{'$set': {'max': next_max_id}}, upsert=True)
             #print("next_max_id:", next_max_id)
             print(hashtag, "len(feed):", feed_len, "< max:", config['max_collect_media'])
             try:
@@ -109,11 +112,7 @@ def get_posts(api, hashtag, config):
                 else:
                     raise e
             feed_len += len(results.get('items', []))
-            #feed.extend(results.get('items', []))
             next_max_id = results.get('next_max_id')
-            #print(next_max_id)
-            #db.config.update_one({},{'$set': {'max': next_max_id}}, upsert=False)
-            #upload_mongo(api, results.get('items', []), config, db)
             p = mp.Process(target=upload_mongo, args=(api, results.get('items', []), config, hashtag))
             jobs.append(p)
             p.start()
