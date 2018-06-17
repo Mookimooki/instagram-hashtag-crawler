@@ -11,8 +11,11 @@ import csv
 
 def crawl(api, hashtag, config):
     # print('Crawling started at origin hashtag', origin['user']['username'], 'with ID', origin['user']['pk'])
-    if visit_profile(api, hashtag, config):
-        pass
+     while True:
+        feed = get_posts(api, hashtag, config)
+
+    #if visit_profile(api, hashtag, config):
+    #    pass
 
 def upload_mongo(api, feed, config):
     print("upload_mongo")
@@ -36,54 +39,14 @@ def upload_mongo(api, feed, config):
     print ("Start upload")
     for post in processed_tagfeed['posts']:
         #if db.post.find_one({"user_id":5053046769,"date":datetime.datetime.fromtimestamp(1529214222).isoformat()})
-        pp.pprint(post)
-        #result = db.post.find_one({"uset_id": post['user_id'], "date": post['date']})
-        if db.post.find({"uset_id": post['user_id'], "date": post['date']}).limit(1).count() < 1:
-            collection.insert(post) 
+        #pp.pprint(post)
+        print(post['user_id'], post['date'])
+        print(db.post.find({"user_id": post['user_id'], "date": post['date']}).limit(1).count())
+        
+        if db.post.find({"user_id": post['user_id'], "date": post['date']}).limit(1).count() < 1:
+            db.post.insert(post) 
         else:
             pass
-        #pp.pprint(post)
-
-def visit_profile(api, hashtag, config):
-    print("start visit_profile")
-    while True:
-        try:
-            processed_tagfeed = {
-                'posts' : []
-            }
-            feed = get_posts(api, hashtag, config)
-            with open(config['profile_path'] + os.sep + str(hashtag) + '_rawfeed.json', 'w') as outfile:
-                json.dump(feed, outfile, indent=2, ensure_ascii=False)
-            profile_dic = {}
-            posts = [beautify_post(api, post, profile_dic) for post in feed]
-            posts = list(filter(lambda x: not x is None, posts))
-            if len(posts) < config['min_collect_media']:
-                return False
-            else:
-                processed_tagfeed['posts'] = posts[:config['max_collect_media']]
-
-            try:
-                if not os.path.exists(config['profile_path'] + os.sep): os.makedirs(config['profile_path'])  
-            except Exception as e:
-                print('exception in profile path')
-                raise e
-
-            try:
-                print("store json")
-                with open(config['profile_path'] + os.sep + str(hashtag) + '.json', 'w') as outfile:
-                    json.dump(processed_tagfeed, outfile, indent=2, ensure_ascii=False)
-
-            except Exception as e:
-                print('exception while dumping')
-                raise e
-
-        except Exception as e:
-            print('exception while visiting profile', e)
-            if str(e) == '-':
-                raise e
-            return False
-        else:
-            return True
 
 def beautify_post(api, post, profile_dic):
     print("start beautify_post")
@@ -136,6 +99,7 @@ def beautify_post(api, post, profile_dic):
 def get_posts(api, hashtag, config):
     print("start_get_posts")
     try:
+        feed_len = 0
         feed = []
         try:
             uuid = api.generate_uuid(return_hex=False, seed='0')
@@ -143,13 +107,15 @@ def get_posts(api, hashtag, config):
         except Exception as e:
             print('exception while getting feed1')
             raise e
-        feed.extend(results.get('items', []))
-
+        feed_len = 0    #len(results.get('items', []))
+        #feed.extend(results.get('items', []))
+        feed_len += len(results.get('items', []))
         if config['min_timestamp'] is not None: return feed
 
         next_max_id = results.get('next_max_id')
         while next_max_id and len(feed) < config['max_collect_media']:
-            print("next_max_id", next_max_id, "len(feed) < max_collect_media", len(feed) < config['max_collect_media'] , len(feed))
+            print("next_max_id:", next_max_id)
+            print("len(feed):", feed_len, "< max:", config['max_collect_media'])
             try:
                 results = api.feed_tag(hashtag, rank_token=uuid, max_id=next_max_id)
             except Exception as e:
@@ -158,10 +124,10 @@ def get_posts(api, hashtag, config):
                     sleep(60)
                 else:
                     raise e
-            feed.extend(results.get('items', []))
+            feed_len += len(results.get('items', []))
+            #feed.extend(results.get('items', []))
             next_max_id = results.get('next_max_id')
             upload_mongo(api, results.get('items', []), config)
-        return feed
 
     except Exception as e:
         print('exception while getting posts')
