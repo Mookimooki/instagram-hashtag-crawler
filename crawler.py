@@ -18,7 +18,7 @@ def crawl(api, hashtag, config):
     #if visit_profile(api, hashtag, config):
     #    pass
 
-def upload_mongo(api, feed, config):
+def upload_mongo(api, feed, config, hashtag):
     print("upload_mongo")
     processed_tagfeed = {
         'posts' : []
@@ -76,8 +76,12 @@ def get_posts(api, hashtag, config):
     try:
         feed_len = 0
         feed = []
-        pp = pprint.PrettyPrinter(indent=2)
-        #pp.pprint(config)
+        
+        client = MongoClient()
+        db = client.BigData
+
+        if db.config.find({"tag":hashtag}).count() > 0:
+            config['max_id'] = db.config.find_one({"tag":hashtag})["max"]
         try:
             uuid = api.generate_uuid(return_hex=False, seed='0')
             #results = api.feed_tag(hashtag, rank_token=uuid, min_timestamp=config['min_timestamp'])
@@ -90,15 +94,12 @@ def get_posts(api, hashtag, config):
         if config['min_timestamp'] is not None :
             upload_mongo(api, results.get('items', []), config)
 
-        client = MongoClient()
-        db = client.BigData
-        print('multi')
         jobs = []
         next_max_id = results.get('next_max_id')
         while next_max_id and len(feed) < config['max_collect_media']:
-            db.config.update_one({},{'$set': {'max': next_max_id}}, upsert=False)
+            db.config.update_one({"tag":hashtag},{'$set': {'max': next_max_id}}, upsert=True)
             #print("next_max_id:", next_max_id)
-            print("len(feed):", feed_len, "< max:", config['max_collect_media'])
+            print(hashtag, "len(feed):", feed_len, "< max:", config['max_collect_media'])
             try:
                 results = api.feed_tag(hashtag, rank_token=uuid, max_id=next_max_id)
             except Exception as e:
@@ -113,7 +114,7 @@ def get_posts(api, hashtag, config):
             #print(next_max_id)
             #db.config.update_one({},{'$set': {'max': next_max_id}}, upsert=False)
             #upload_mongo(api, results.get('items', []), config, db)
-            p = mp.Process(target=upload_mongo, args=(api, results.get('items', []), config))
+            p = mp.Process(target=upload_mongo, args=(api, results.get('items', []), config, hashtag))
             jobs.append(p)
             p.start()
         for p in jobs:
