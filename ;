@@ -4,8 +4,6 @@ from collections import deque
 from re import findall
 from time import time, sleep
 from util import randselect, byteify, file_to_list
-import pprint # test log
-import time 
 from pymongo import MongoClient
 import csv
 
@@ -17,49 +15,42 @@ def crawl(api, hashtag, config):
 def visit_profile(api, hashtag, config):
     while True:
         try:
+
             processed_tagfeed = {
                 'posts' : []
             }
             feed = get_posts(api, hashtag, config)
+            number = 0
+            for mark in marks:
+                number = number +1
             with open(config['profile_path'] + os.sep + str(hashtag) + '_rawfeed.json', 'w') as outfile:
-                json.dump(feed, outfile, indent=2, ensure_ascii=False)
+                            json.dump(feed, outfile, indent=2, ensure_ascii=False)
             profile_dic = {}
             posts = [beautify_post(api, post, profile_dic) for post in feed]
             posts = list(filter(lambda x: not x is None, posts))
             if len(posts) < config['min_collect_media']:
-                return False
+                    return False
             else:
-                processed_tagfeed['posts'] = posts[:config['max_collect_media']]
+                    processed_tagfeed['posts'] = posts[:config['max_collect_media']]
 
             try:
-                if not os.path.exists(config['profile_path'] + os.sep): os.makedirs(config['profile_path'])  
+                    if not os.path.exists(config['profile_path'] + os.sep): os.makedirs(config['profile_path'])  
             except Exception as e:
-                print('exception in profile path')
-                raise e
+                    print('exception in profile path')
+                    raise e
 
             try:
                 with open(config['profile_path'] + os.sep + str(hashtag) + '.json', 'w') as outfile:
                     json.dump(processed_tagfeed, outfile, indent=2, ensure_ascii=False)
-                #pp = pprint.PrettyPrinter(indent=4)
-                #pp.pprint(processed_tagfeed['posts'][0])
-                #for post in feed:
-                #    print(type(post))
-                ##    time.sleep(5)
-
-                #client = MongoClient('localhost', 27017)
-                #db = client.test_database
-                #collection = db.post
-
             except Exception as e:
-                print('exception while dumping')
-                raise e
-
-        except Exception as e:
+                    print('exception while dumping')
+                    raise e
+    except Exception as e:
             print('exception while visiting profile', e)
             if str(e) == '-':
-                raise e
+                    raise e
             return False
-        else:
+    else:
             return True
 
 def beautify_post(api, post, profile_dic):
