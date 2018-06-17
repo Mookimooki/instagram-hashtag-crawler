@@ -30,24 +30,18 @@ def upload_mongo(api, feed, config):
         return False
     else:
         processed_tagfeed['posts'] = posts[:config['max_collect_media']]
-        
-        client = MongoClient('localhost', 27017)
-        db = client.BigData
-        
+    client = MongoClient('localhost', 27017)
+    db = client.BigData
 
-        #pp = pprint.PrettyPrinter(indent=2)
+    pp = pprint.PrettyPrinter(indent=2)
     print ("Start upload")
     for post in processed_tagfeed['posts']:
-        #if db.post.find_one({"user_id":5053046769,"date":datetime.datetime.fromtimestamp(1529214222).isoformat()})
-        #pp.pprint(post)
-        print(post['user_id'], post['date'])
         #print(db.post.find({"user_id": post['user_id'], "date": post['date']}).limit(1).count())
-        
+        print(post['date'])
         if db.post.find({"user_id": post['user_id'], "date": post['date']}).limit(1).count() < 1:
             db.post.insert(post) 
         else:
             pass
-    client.close()
 
 def beautify_post(api, post, profile_dic):
     #print("start beautify_post")
@@ -55,27 +49,15 @@ def beautify_post(api, post, profile_dic):
         if post['media_type'] != 1: # If post is not a single image media
             return None
         keys = post.keys()
-        # print(post)
         user_id = post['user']['pk']
-        #profile = profile_dic.get(user_id, False)
-        """
-        while True:
-            try:
-                sleep(0.05)
-                if not profile:
-                    profile = api.user_info(user_id)
-                    profile_dic[user_id] = profile
-            except Exception as e:
-                # print(post)
-                print('exception in getting user_info from {} {}'.format(user_id, post['user']['username']), e)
-                sleep(5)
-                # raise e
-            else:
-                break
-        """
-        # profile = api.username_info('simon_oncepiglet')
-        # print(profile)
-        # print('Visiting:', profile['user']['username'])
+        
+        client = MongoClient('localhost', 27017)
+        db = client.BigData
+
+        db.config.update_one({},{'$set': {'max': post['taken_at']}}, upsert=False)
+        print(post['taken_at'])
+        client.close()
+
         processed_media = {
             'user_id' : user_id,
             #'username' : profile['user']['username'],
@@ -102,14 +84,16 @@ def get_posts(api, hashtag, config):
     try:
         feed_len = 0
         feed = []
+        pp = pprint.PrettyPrinter(indent=2)
+        #pp.pprint(config)
         try:
             uuid = api.generate_uuid(return_hex=False, seed='0')
+            #results = api.feed_tag(hashtag, rank_token=uuid, min_timestamp=config['min_timestamp'])
             results = api.feed_tag(hashtag, rank_token=uuid, min_timestamp=config['min_timestamp'])
         except Exception as e:
             print('exception while getting feed1')
             raise e
-        feed_len = 0    #len(results.get('items', []))
-        #feed.extend(results.get('items', []))
+        feed_len = 0
         feed_len += len(results.get('items', []))
         if config['min_timestamp'] is not None :
             upload_mongo(api, results.get('items', []), config)
@@ -119,7 +103,7 @@ def get_posts(api, hashtag, config):
 
         jobs = []
         next_max_id = results.get('next_max_id')
-        db.config.update_one({},{'$set': {'max': next_max_id}}, upsert=False)
+        #db.config.update_one({},{'$set': {'max': next_max_id}}, upsert=False)
         while next_max_id and len(feed) < config['max_collect_media']:
             #print("next_max_id:", next_max_id)
             print("len(feed):", feed_len, "< max:", config['max_collect_media'])
@@ -134,14 +118,14 @@ def get_posts(api, hashtag, config):
             feed_len += len(results.get('items', []))
             #feed.extend(results.get('items', []))
             next_max_id = results.get('next_max_id')
-            db.config.update_one({},{'$set': {'max': next_max_id}}, upsert=False)
+            #db.config.update_one({},{'$set': {'max': next_max_id}}, upsert=False)
             #upload_mongo(api, results.get('items', []), config, db)
             p = mp.Process(target=upload_mongo, args=(api, results.get('items', []), config))
             jobs.append(p)
             p.start()
         for p in jobs:
             p.join()
-
+        client.close()
     except Exception as e:
         print('exception while getting posts')
         raise e
