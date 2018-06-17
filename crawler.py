@@ -50,14 +50,6 @@ def beautify_post(api, post, profile_dic):
             return None
         keys = post.keys()
         user_id = post['user']['pk']
-        
-        client = MongoClient('localhost', 27017)
-        db = client.BigData
-
-        db.config.update_one({},{'$set': {'max': post['taken_at']}}, upsert=False)
-        print(post['taken_at'])
-        client.close()
-
         processed_media = {
             'user_id' : user_id,
             #'username' : profile['user']['username'],
@@ -89,7 +81,7 @@ def get_posts(api, hashtag, config):
         try:
             uuid = api.generate_uuid(return_hex=False, seed='0')
             #results = api.feed_tag(hashtag, rank_token=uuid, min_timestamp=config['min_timestamp'])
-            results = api.feed_tag(hashtag, rank_token=uuid, min_timestamp=config['min_timestamp'])
+            results = api.feed_tag(hashtag, rank_token=uuid, max_id=config['max_id'])
         except Exception as e:
             print('exception while getting feed1')
             raise e
@@ -100,11 +92,11 @@ def get_posts(api, hashtag, config):
 
         client = MongoClient()
         db = client.BigData
-
+        print('multi')
         jobs = []
         next_max_id = results.get('next_max_id')
-        #db.config.update_one({},{'$set': {'max': next_max_id}}, upsert=False)
         while next_max_id and len(feed) < config['max_collect_media']:
+            db.config.update_one({},{'$set': {'max': next_max_id}}, upsert=False)
             #print("next_max_id:", next_max_id)
             print("len(feed):", feed_len, "< max:", config['max_collect_media'])
             try:
@@ -118,6 +110,7 @@ def get_posts(api, hashtag, config):
             feed_len += len(results.get('items', []))
             #feed.extend(results.get('items', []))
             next_max_id = results.get('next_max_id')
+            print(next_max_id)
             #db.config.update_one({},{'$set': {'max': next_max_id}}, upsert=False)
             #upload_mongo(api, results.get('items', []), config, db)
             p = mp.Process(target=upload_mongo, args=(api, results.get('items', []), config))
